@@ -65,7 +65,7 @@ interface NavbarProps {
 export default function Navbar({
   logo = <NextLearnLogo className="size-8" />,
   name = "Next Learn",
-  homeUrl = siteConfig.url,
+  homeUrl = "/",
   mobileLinks = [
     { text: "Getting Started", href: siteConfig.url },
     { text: "Components", href: siteConfig.url },

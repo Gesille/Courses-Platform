@@ -87,6 +87,25 @@ export interface IMyCourseEntry {
   passed?: boolean;
 }
 
+export interface IAttempt {
+  _id: string;
+  status: "not_started" | "in_progress" | "completed" | "expired" | "abandoned";
+  completionState: "not_started" | "content_in_progress" | "quiz_in_progress" | "completed";
+  videoProgressSeconds: number;
+  videoCompletedAt?: string;
+  contentCompletedAt?: string;
+  quizStartedAt?: string;
+  quizExpiresAt?: string;
+  timeLimitSeconds: number;
+  score: number;
+  totalPossibleScore: number;
+  percentage: number;
+  passed: boolean;
+  hasRated: boolean;
+  isLate: boolean;
+  dueAt?: string;
+}
+
 export interface ICourseAnalytics {
   course: { id: string; title: string; courseCode: string };
   summary: {
@@ -117,11 +136,18 @@ export interface ICourseTrackerFilters {
   department?: string;
 }
 
+export interface ICommentAttachment {
+  public_id: string;
+  url: string;
+  resourceType: "image" | "video";
+}
+
 export interface ICommentMessage {
   _id?: string;
   text: string;
   authorId: string;
   authorRole: "employee" | "admin" | "manager" | "system";
+  attachment?: ICommentAttachment;
   createdAt: string;
   isEdited: boolean;
 }
@@ -161,6 +187,14 @@ export interface IQuizAnswerInput {
   selectedOptionIndex?: number;
   timeSpentSeconds?: number;
 }
+
+/** Build multipart/form-data for the comment endpoints so an optional file can ride along. */
+const commentFormData = (text: string, file?: File | null) => {
+  const form = new FormData();
+  form.append("text", text);
+  if (file) form.append("attachment", file);
+  return form;
+};
 
 /* ────────────────────────────────────────────────────────────────────────
  * API slice
@@ -220,6 +254,16 @@ export const courseApi = apiSlice.injectEndpoints({
         { type: "Dashboard", id },
         { type: "Dashboard", id: "LIST" },
       ],
+    }),
+
+    // NEW — hero image upload, multipart/form-data
+    uploadCourseHeroImage: builder.mutation<{ success: boolean; course: ICourse }, { id: string; file: File }>({
+      query: ({ id, file }) => {
+        const form = new FormData();
+        form.append("image", file);
+        return { url: `${BASE}/${id}/hero-image`, method: "POST", body: form };
+      },
+      invalidatesTags: (_result, _error, { id }) => [{ type: "Dashboard", id }],
     }),
 
     publishCourse: builder.mutation<{ success: boolean; message: string; course: ICourse }, string>({
@@ -312,7 +356,7 @@ export const courseApi = apiSlice.injectEndpoints({
       providesTags: [{ type: "Dashboard", id: "MY_COURSES" }],
     }),
 
-    openCourse: builder.query<{ success: boolean; course: ICourse; attempt: any }, string>({
+    openCourse: builder.query<{ success: boolean; course: ICourse; attempt: IAttempt; questions: ICourseQuestion[] }, string>({
       query: (id) => ({
         url: `${BASE}/open-course/${id}`,
         method: "GET",
@@ -321,7 +365,7 @@ export const courseApi = apiSlice.injectEndpoints({
     }),
 
     updateVideoProgress: builder.mutation<
-      { success: boolean },
+      { success: boolean; attempt: IAttempt },
       { id: string; progressSeconds: number; completed?: boolean }
     >({
       query: ({ id, progressSeconds, completed }) => ({
@@ -329,16 +373,21 @@ export const courseApi = apiSlice.injectEndpoints({
         method: "PATCH",
         body: { progressSeconds, completed },
       }),
+      invalidatesTags: (_result, _error, { id }) => [{ type: "Dashboard", id: `open-${id}` }],
     }),
 
-    markContentViewed: builder.mutation<{ success: boolean }, string>({
+    markContentViewed: builder.mutation<{ success: boolean; attempt: IAttempt }, string>({
       query: (id) => ({
         url: `${BASE}/content-viewed/${id}`,
         method: "PATCH",
       }),
+      invalidatesTags: (_result, _error, id) => [{ type: "Dashboard", id: `open-${id}` }],
     }),
 
-    startQuiz: builder.mutation<{ success: boolean; questions: ICourseQuestion[]; expiresAt: string }, string>({
+    startQuiz: builder.mutation<
+      { success: boolean; quizStartedAt: string; quizExpiresAt: string; timeLimitSeconds: number; questions: ICourseQuestion[] },
+      string
+    >({
       query: (id) => ({
         url: `${BASE}/start-quize/${id}`,
         method: "POST",
@@ -346,7 +395,7 @@ export const courseApi = apiSlice.injectEndpoints({
     }),
 
     autosaveQuizAnswers: builder.mutation<
-      { success: boolean },
+      { success: boolean; savedAnswers: number; quizExpiresAt: string },
       { id: string; answers: IQuizAnswerInput[] }
     >({
       query: ({ id, answers }) => ({
@@ -357,7 +406,16 @@ export const courseApi = apiSlice.injectEndpoints({
     }),
 
     submitQuiz: builder.mutation<
-      { success: boolean; score: number; percentage: number; passed: boolean },
+      {
+        success: boolean;
+        score: number;
+        totalPossibleScore: number;
+        percentage: number;
+        passed: boolean;
+        isLate: boolean;
+        correctAnswersCount: number;
+        totalQuestions: number;
+      },
       { id: string; answers: IQuizAnswerInput[] }
     >({
       query: ({ id, answers }) => ({
@@ -373,11 +431,11 @@ export const courseApi = apiSlice.injectEndpoints({
 
     /* ── Comments ───────────────────────────────────────────────────── */
 
-    addComment: builder.mutation<{ success: boolean; comment: ICourseComment }, { id: string; text: string }>({
-      query: ({ id, text }) => ({
+    addComment: builder.mutation<{ success: boolean; comment: ICourseComment }, { id: string; text: string; file?: File | null }>({
+      query: ({ id, text, file }) => ({
         url: `${BASE}/add-comments/${id}`,
         method: "POST",
-        body: { text },
+        body: commentFormData(text, file),
       }),
       invalidatesTags: (_result, _error, { id }) => [{ type: "Question", id: `comments-${id}` }],
     }),
@@ -408,24 +466,24 @@ export const courseApi = apiSlice.injectEndpoints({
 
     replyToComment: builder.mutation<
       { success: boolean; comment: ICourseComment },
-      { commentId: string; text: string }
+      { commentId: string; text: string; file?: File | null }
     >({
-      query: ({ commentId, text }) => ({
+      query: ({ commentId, text, file }) => ({
         url: `${BASE}/comments-reply/${commentId}`,
         method: "PATCH",
-        body: { text },
+        body: commentFormData(text, file),
       }),
       invalidatesTags: [{ type: "Question", id: "OPEN_COMMENTS" }],
     }),
 
     addThreadMessage: builder.mutation<
       { success: boolean; comment: ICourseComment },
-      { commentId: string; courseId: string; text: string }
+      { commentId: string; courseId: string; text: string; file?: File | null }
     >({
-      query: ({ commentId, text }) => ({
+      query: ({ commentId, text, file }) => ({
         url: `${BASE}/comments/${commentId}/messages`,
         method: "POST",
-        body: { text },
+        body: commentFormData(text, file),
       }),
       invalidatesTags: (_result, _error, { courseId }) => [
         { type: "Question", id: `comments-${courseId}` },
@@ -447,6 +505,7 @@ export const courseApi = apiSlice.injectEndpoints({
       invalidatesTags: (_result, _error, { id }) => [
         { type: "Analytics", id: `rating-${id}` },
         { type: "Analytics", id: "LEADERBOARD" },
+        { type: "Dashboard", id: `open-${id}` },
       ],
     }),
 
@@ -485,6 +544,7 @@ export const {
   useGetAllCoursesQuery,
   useGetCourseByIdQuery,
   useUpdateCourseMutation,
+  useUploadCourseHeroImageMutation, // NEW
   usePublishCourseMutation,
   useArchiveCourseMutation,
   useGetCourseAnalyticsQuery,

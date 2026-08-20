@@ -93,15 +93,10 @@ export default function RootLayout({
         className={`${jakarta.variable} bg-background font-sans antialiased`}
       >
        <Providers>
-         <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-        >
+      
           <ScrollReveal />
           {children}
-        </ThemeProvider>
+    
        </Providers>
       </body>
     </html>

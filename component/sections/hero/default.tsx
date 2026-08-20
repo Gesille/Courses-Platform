@@ -39,13 +39,13 @@ interface HeroProps {
 
 const DEFAULT_BUTTONS: HeroButtonProps[] = [
   {
-    href: siteConfig.getStartedUrl,
+    href: "/courses",
     text: "Start this week's challenge",
     variant: "default",
     iconRight: <ArrowRightIcon className="ml-2 size-4" />,
   },
   {
-    href: "#how-it-works",
+    href: "/how-it-works",
     text: "See how it works",
     variant: "glow",
   },

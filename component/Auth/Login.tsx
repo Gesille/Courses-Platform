@@ -86,6 +86,7 @@ const Login: FC<Props> = ({ setRoute, setOpen, refetch }) => {
               name="email"
               value={values.email}
               onChange={handleChange}
+              
               id="email"
               placeholder="you@example.com"
               className={`w-full h-11 pl-10 pr-3 rounded-xl border bg-background text-sm text-foreground placeholder:text-muted-foreground outline-none transition focus:ring-2 focus:ring-ring/40 focus:border-primary ${

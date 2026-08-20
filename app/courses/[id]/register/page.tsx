@@ -1,12 +1,12 @@
 import { notFound } from "next/navigation";
-import CourseOverview from "@/component/sections/courses/course-overview";
+import CourseRegistration from "@/component/sections/courses/course-registration";
 import { COURSES, getCourse } from "@/component/sections/courses/next-learn-data";
 
 export function generateStaticParams() { return COURSES.map((course) => ({ id: course.id })); }
 
-export default async function CoursePage({ params }: { params: Promise<{ id: string }> }) {
+export default async function CourseRegistrationPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const course = getCourse(id);
   if (!course) notFound();
-  return <CourseOverview />;
+  return <CourseRegistration course={course} />;
 }

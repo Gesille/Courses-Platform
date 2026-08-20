@@ -8,6 +8,7 @@ import FAQ from "@/component/sections/faq/default";
 import Footer from "@/component/sections/footer/default";
 
 import CoursePreview from "@/component/sections/courses/course-preview";
+import ManagerPage from "@/component/sections/manager/page";
 
 export default function Home() {
   return (
@@ -18,6 +19,7 @@ export default function Home() {
       <Logos />
       <Items />
       <CoursePreview />
+      <ManagerPage />
       <FAQ />
 
       <Footer />

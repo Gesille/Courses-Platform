@@ -8,5 +8,5 @@ export default async function CoursePage({ params }: { params: Promise<{ id: str
   const { id } = await params;
   const course = getCourse(id);
   if (!course) notFound();
-  return <CourseOverview />;
+  return <CourseOverview course={course} />;
 }
